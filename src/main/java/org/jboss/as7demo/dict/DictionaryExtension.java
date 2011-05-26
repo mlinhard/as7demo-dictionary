@@ -189,6 +189,7 @@ public class DictionaryExtension implements Extension, XMLElementReader<List<Mod
       @Override
       public OperationResult execute(OperationContext context, final ModelNode operation, ResultHandler resultHandler) throws OperationFailedException {
          ModelNode opAddr = operation.require(ModelDescriptionConstants.OP_ADDR);
+         final String key = PathAddress.pathAddress(opAddr).getLastElement().getValue();
          ModelNode removeOperation = Util.getResourceRemoveOperation(opAddr);
 
          populate(operation, context.getSubModel());
@@ -200,7 +201,7 @@ public class DictionaryExtension implements Extension, XMLElementReader<List<Mod
                  public void execute(RuntimeTaskContext context) throws OperationFailedException {
                     ServiceController<?> serviceController = context.getServiceRegistry().getService(DictionaryService.getServiceName());
                     DictionaryService service = (DictionaryService) serviceController.getValue();
-                    service.add(operation.get(KEY).asString(), operation.get(VALUE).asString());
+                    service.add(key, operation.get(VALUE).asString());
                  }
              };
              runtime.setRuntimeTask(task);
@@ -218,7 +219,6 @@ public class DictionaryExtension implements Extension, XMLElementReader<List<Mod
       }
 
       private static void populate(ModelNode source, ModelNode target) {
-         target.get(KEY).set(source.require(KEY));
          target.get(VALUE).set(source.require(VALUE));
       }
 
@@ -232,8 +232,27 @@ public class DictionaryExtension implements Extension, XMLElementReader<List<Mod
       }
 
       @Override
-      public OperationResult execute(OperationContext context, ModelNode operation, ResultHandler resultHandler) throws OperationFailedException {
-         return null;
+      public OperationResult execute(OperationContext opContext, ModelNode operation, ResultHandler resultHandler) throws OperationFailedException {
+         ModelNode opAddr = operation.require(ModelDescriptionConstants.OP_ADDR);
+         final String key = PathAddress.pathAddress(opAddr).getLastElement().getValue();
+         ModelNode restoreOperation = EntryAdd.createOperation(opAddr, opContext.getSubModel());
+
+         RuntimeOperationContext runtime = opContext.getRuntimeContext();
+         if (runtime != null) {
+             RuntimeTask task = new RuntimeTask() {
+                 @Override
+                 public void execute(RuntimeTaskContext context) throws OperationFailedException {
+                    ServiceController<?> serviceController = context.getServiceRegistry().getService(DictionaryService.getServiceName());
+                    DictionaryService service = (DictionaryService) serviceController.getValue();
+                    service.remove(key);
+                 }
+             };
+             runtime.setRuntimeTask(task);
+         } else {
+             resultHandler.handleResultComplete();
+         }
+
+         return new BasicOperationResult(restoreOperation);
       }
 
    }
@@ -281,9 +300,7 @@ public class DictionaryExtension implements Extension, XMLElementReader<List<Mod
    private ModelNode parseEntry(XMLExtendedStreamReader reader, ModelNode address) throws XMLStreamException {
       ModelNode entry = Util.getEmptyOperation(ModelDescriptionConstants.ADD, address);
       ParseUtils.requireAttributes(reader, KEY, VALUE);
-      String key = reader.getAttributeValue(null, KEY);
-      entry.get(ModelDescriptionConstants.OP_ADDR).add(ENTRY, key);
-      entry.get(KEY).set(key);
+      entry.get(ModelDescriptionConstants.OP_ADDR).add(ENTRY, reader.getAttributeValue(null, KEY));
       entry.get(VALUE).set(reader.getAttributeValue(null, VALUE));
       return entry;
    }

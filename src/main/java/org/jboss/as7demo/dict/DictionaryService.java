@@ -21,6 +21,7 @@
  */
 package org.jboss.as7demo.dict;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -28,6 +29,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 
 import org.jboss.logging.Logger;
 import org.jboss.msc.service.Service;
@@ -39,23 +43,25 @@ import org.jboss.msc.service.StopContext;
 
 /**
  * Dictionary Demo service implementation.
- *
+ * 
  * @author Michal Linhard
  */
-public class DictionaryService implements Service<DictionaryService> {
-   private static final ServiceName SERVICE_NAME = ServiceName.of(DictionaryExtension.SUBSYSTEM_NAME);
+public class DictionaryService implements Service<DictionaryService>, DictionaryServiceMBean {
+   private static final ServiceName SERVICE_NAME = ServiceName
+            .of(DictionaryExtension.SUBSYSTEM_NAME);
 
-   private static final Logger log = Logger.getLogger(DictionaryExtension.class.getPackage().getName());
+   private static final Logger log = Logger.getLogger(DictionaryExtension.class.getPackage()
+            .getName());
    private Map<String, String> dictionary = new ConcurrentHashMap<String, String>();
 
    public static ServiceName getServiceName() {
       return SERVICE_NAME;
-  }
+   }
 
    public static void addService(ServiceTarget serviceTarget) {
       DictionaryService service = new DictionaryService();
       serviceTarget.addService(SERVICE_NAME, service).install();
-  }
+   }
 
    @Override
    public DictionaryService getValue() throws IllegalStateException, IllegalArgumentException {
@@ -64,7 +70,14 @@ public class DictionaryService implements Service<DictionaryService> {
 
    @Override
    public void start(StartContext context) throws StartException {
-      log.debug("Dictionary service started");
+      try {
+         ObjectName objectName = new ObjectName("dictionary.demo", "name", "dictionary");
+         MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+         mBeanServer.registerMBean(this, objectName);
+         log.debug("Dictionary service started");
+      } catch (Exception e) {
+         log.error("Couldn't register DictionaryServiceMBean", e);
+      }
    }
 
    @Override
@@ -76,13 +89,18 @@ public class DictionaryService implements Service<DictionaryService> {
       dictionary.put(key, value);
    }
 
+   public void remove(String key) {
+      dictionary.remove(key);
+   }
+
    public String find(String key) {
       return dictionary.get(key);
    }
 
    public synchronized String list() {
       StringBuffer sb = new StringBuffer();
-      List<Map.Entry<String, String>> list = new ArrayList<Map.Entry<String,String>>(dictionary.entrySet());
+      List<Map.Entry<String, String>> list = new ArrayList<Map.Entry<String, String>>(dictionary
+               .entrySet());
       Collections.sort(list, new Comparator<Map.Entry<String, String>>() {
          @Override
          public int compare(Entry<String, String> o1, Entry<String, String> o2) {

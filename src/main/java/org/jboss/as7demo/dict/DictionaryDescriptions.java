@@ -80,10 +80,6 @@ public class DictionaryDescriptions {
    public static ModelNode getDictionaryEntryAddDescription(Locale locale) {
       ResourceBundle res = getResources(locale);
       ModelNode reqProps = new ModelNode();
-      ModelNode keyArg = reqProps.get("key").addEmptyObject();
-      keyArg.get("type").set(ModelType.STRING);
-      keyArg.get("description").set(res.getString("dict.entry.add.key"));
-      keyArg.get("required").set(true);
       ModelNode valueArg = reqProps.get("value").addEmptyObject();
       valueArg.get("type").set(ModelType.STRING);
       valueArg.get("description").set(res.getString("dict.entry.add.value"));
